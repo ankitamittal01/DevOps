@@ -1,0 +1,244 @@
+pipeline {
+
+	agent { label 'rstz0954' }
+
+	parameters {
+
+		string(name: 'Branch', defaultValue: 'release/20180611')
+		
+		string(name: 'ModuleName', defaultValue: '')
+		
+		string(name: 'SubApp', defaultValue: 'Order')
+		
+		string(name: 'PHASE', defaultValue: 'BUILD-DEPLOY', description: 'The stage to run this pipeline')
+		
+		string(name: 'TARGET_ENV', defaultValue: 'dev_rstz0954_order_po_ng', , description: 'The node group for the SWM to deploy')		
+
+	}
+
+	environment { 
+
+		APPNAME = "LSRV_Single"
+
+		DEBUG_FLAGS = '-g'
+
+		MOTS_ID="13504"
+
+	}
+
+	tools{
+
+		jdk 'jdk1.8'
+
+	}
+	
+	stages{
+		
+		stage("Checkout"){
+		
+            when {
+                expression { params.PHASE == 'BUILD-DEPLOY' || params.PHASE == 'BUILD-ONLY' }
+                                  }				
+		
+		steps{
+		
+		script {
+			env.release = sh (script: 'echo ${Branch} | cut -d "/" -f2', returnStdout: true).trim()
+		}
+		
+		sh 'echo branch is: ${Branch}'
+		
+		sh 'echo release is: ${release}'
+		
+		sh 'pwd'
+		
+		sh 'echo ECO_PIPELINE_ID is ${ECO_PIPELINE_ID}'
+		
+		sh 'mkdir -p /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/SingleModule_Pipeline'
+		
+		sh 'cd /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/SingleModule_Pipeline'
+		
+		sh 'rm -rf DEPO'
+		
+		sh 'rm -rf Single_module_pipeline_build.sh'
+		
+		sh 'rm -rf deploy_single_jenkins.sh'
+
+		checkout([$class: 'GitSCM',
+		 branches: [[name: '*/${Branch}']],
+		 doGenerateSubmoduleConfigurations: false,
+		 extensions: [],
+		 gitTool: 'GIT',
+		 submoduleCfg: [],
+		 userRemoteConfigs: [[credentialsId: '8d97233b-ae8f-4023-8955-7df898871a7d',
+		 url: 'https://codecloud.web.att.com/scm/st_lsrv2/lsrv.git']]])
+		 }
+
+		}
+
+		stage("Build"){
+            when {
+                expression { params.PHASE == 'BUILD-DEPLOY' || params.PHASE == 'BUILD-ONLY' }
+                                } 			
+			steps{
+		
+			sh 'cd /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/SingleModule_Pipeline'
+
+			sh 'cp Jenkins_Scripts/Single_module_pipeline_build.sh .'
+			sh 'cp Jenkins_Scripts/deploy_single_jenkins.sh .'
+			sh 'chmod 777 *'
+
+			sh './Single_module_pipeline_build.sh ${ModuleName} ${release} ${SubApp}'
+			}
+		
+		}
+		
+		stage("Upload to Nexus"){
+                when {
+                expression { params.PHASE == 'BUILD-DEPLOY' || params.PHASE == 'BUILD-ONLY' }
+                                  } 		
+			steps{
+			sh './deploy_single_jenkins.sh ${ModuleName} ${release}'
+			}
+		
+		}		
+		
+		stage("Upload to SWM"){
+                when {
+                expression { params.PHASE == 'BUILD-DEPLOY' || params.PHASE == 'BUILD-ONLY' }
+                                  } 		
+			steps{
+				
+			script {
+				env.SWM_VER = sh (script: 'cat /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/SCRIPTS/single_swm_versions.txt', returnStdout: true).trim()
+				env.AFTSWM_USERNAME = "m24363@lsrv01.att.com"
+				env.AFTSWM_PASSWORD = "enc:E04815BCE2EA8773FEACDEBF8DA79291"
+				}
+
+			sh '''mkdir -p /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/SingleModule_Pipeline/swm_scripts/single_module/swm/dist_files/single_module/
+			
+				cp /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/SingleModule_Pipeline/DEPO/${ModuleName}_${release}.tar.gz /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/SingleModule_Pipeline/swm_scripts/single_module/swm/dist_files/single_module/single_module.tar.gz
+
+				rm -rf /export/home/lsrv/.subversion/auth/svn.simple/90bd1ac57b7055f82bb22b8d2ee70e4a
+
+				. /appl/shared/tools/build_ls_lsrv_artix5_5.env
+
+				cd /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/SingleModule_Pipeline/swm_scripts
+
+				rm -rf /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/SingleModule_Pipeline/swm_scripts/single_module/.svn
+
+				rm -rf /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/SingleModule_Pipeline/swm_scripts/single_module/swm/.svn
+
+				rm -rf /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/SingleModule_Pipeline/swm_scripts/single_module/swm/*/.svn
+
+				rm -rf /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/SingleModule_Pipeline/swm_scripts/single_module/swm/*/*/.svn
+
+				/opt/app/aft/aftswmcli/bin/swmcli \\ component pkgcreate -c com.att.lsrv:single_module:${SWM_VER} -d ./single_module'''
+
+			}
+		
+		}	
+
+
+		stage("SAST"){
+                when {
+                expression { params.PHASE == 'BUILD-DEPLOY'}
+                                  } 			
+			steps{
+			echo "*****SASTAnalysis***************"
+			
+			script {
+
+                        def vAppName = '13504-LSRV'
+
+                        def vSandBoxName = vAppName+'_${ModuleName}'+ "_${env.BUILD_NUMBER}"
+
+                        def vScanName = vSandBoxName
+  
+                        def vUpldPattrn='**/**.tar.gz'
+                          
+                          def Dirurl='/appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/SingleModule_Pipeline/DEPO'
+
+                            try {
+
+                               dir (Dirurl) {
+
+									veracode applicationName: vAppName,
+
+                                    createProfile: true,
+
+                                    criticality: 'High',
+
+                                    debug: true,
+  
+                                    createSandbox: true,
+
+                                    sandboxName: vSandBoxName,
+  
+                                    scanName: vScanName,
+
+                                    teams: "Default Team",
+
+                                    uploadIncludesPattern: vUpldPattrn,
+
+                                    useIDkey: true, 
+ 
+                                    vid: '874f2783db4c9f09b06c47d8be1f6de9', 
+ 
+                                    vkey: 'd0b6c3e0e821022393441f795eec61f99f18eb439e531d1f6a71e3fa18c28326638e83e0f83b449d1d45c8b98a9ab0acdd16979ca83129707623c90b2f3af936',
+
+                                    useProxy: true,
+
+                                    pHost: 'one.proxy.att.com',
+
+                                    pPort: '8080'
+
+								}
+
+                            }
+
+                            catch(Exception ex) {
+   
+								println 'unable to scan error:' + ex.toString()
+
+								ex.printStackTrace()
+  
+							}
+  
+					}
+			
+			}
+		}
+		
+		stage("Deploy"){
+                when {
+                expression { params.PHASE == 'BUILD-DEPLOY' }
+                                  } 		
+			steps{
+			script {
+				env.SWM_VER = sh (script: 'cat /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/SCRIPTS/single_swm_versions.txt', returnStdout: true).trim()
+				env.AFTSWM_USERNAME = "m24363@lsrv01.att.com"
+				env.AFTSWM_PASSWORD = "enc:E04815BCE2EA8773FEACDEBF8DA79291"
+				}
+				sh '''rm -rf /export/home/lsrv/.subversion/auth/svn.simple/90bd1ac57b7055f82bb22b8d2ee70e4a
+				
+				. /appl/shared/tools/build_lsrv_artix5_5_JAX_WS_JDK8_deployment_pipeline.env
+				
+				rm -f /appl/LSRV/swm/log/exit_status.txt
+				
+				/opt/app/aft/aftswmcli/bin/swmcli \\ component pkginstall -c com.att.lsrv:single_module:${SWM_VER} -ng ${TARGET_ENV} -w'''
+			}
+		
+		}		
+	}
+	
+	post{ 
+		always{ 
+			emailext( 
+		subject: "Build ${env.JOB_NAME} -${currentBuild.displayName} ${currentBuild.result}", 
+		body: "${currentBuild.currentResult}: Job ${env.JOB_NAME} build ${env.SWM_VER}\nMore info at: ${env.BUILD_URL}",
+		recipientProviders: [[$class:'DevelopersRecipientProvider'],[$class:'RequesterRecipientProvider'],[$class:'UpstreamComitterRecipientProvider']] )   
+		}
+	}
+	
+}

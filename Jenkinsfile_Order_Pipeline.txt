@@ -1,0 +1,355 @@
+pipeline {
+
+	agent { label 'rstz0954' }
+
+	parameters {
+
+		string(name: 'Branch', defaultValue: 'release/20180611')
+		
+		string(name: 'PHASE', defaultValue: 'BUILD-DEPLOY', description: 'The stage to run this pipeline')
+		
+		string(name: 'TARGET_ENV', defaultValue: 'dev_rstz0954_order_po_ng', , description: 'The node group for the SWM to deploy')
+
+	}
+
+	environment { 
+
+		APPNAME = "LSRV_ORDER"
+
+		DEBUG_FLAGS = '-g'
+
+		MOTS_ID="13504"
+
+	}
+
+	tools{
+
+		jdk 'jdk1.8'
+
+	}
+	
+	
+	stages{
+		
+		stage("Checkout"){
+		
+            when {
+                expression { params.PHASE == 'BUILD-DEPLOY' || params.PHASE == 'SONAR' || params.PHASE == 'BUILD-ONLY' }
+                                  }						
+		steps{		
+		
+		script {
+			env.release = sh (script: 'echo ${Branch} | cut -d "/" -f2', returnStdout: true).trim()
+		}
+		
+		sh 'echo branch is: ${Branch}'
+		
+		sh 'echo release is: ${release}'
+		
+		sh 'pwd'
+		
+		sh 'echo ECO_PIPELINE_ID is ${ECO_PIPELINE_ID}'
+		
+		sh 'mkdir -p /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/Order_pipeline'
+		
+		sh 'cd /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/Order_pipeline'
+		
+		sh 'rm -rf *'
+
+		checkout([$class: 'GitSCM',
+		 branches: [[name: '*/${Branch}']],
+		 doGenerateSubmoduleConfigurations: false,
+		 extensions: [[$class: 'SparseCheckoutPaths',
+		 sparseCheckoutPaths: [[path: '/lsrv_base'],
+		 [path: '/Cron_Scripts'],
+		 [path: '/lsrv_lib'],
+		 [path: '/SecurityMod'],
+		 [path: '/lvi'],
+		 [path: '/orbix_conf'],
+		 [path: '/ruleEngineUnep'],
+		 [path: '/rules_lsrv'],
+		 [path: '/GiomRuleEngine'],
+		 [path: '/CanopiRuleEngine'],
+		 [path: '/swf_soap_artix'],
+		 [path: '/lsrv_bin'],
+		 [path: '/lsrv_conf'],
+		 [path: '/Lsrv_dbscripts'],
+		 [path: '/ReportGenerator'],
+		 [path: '/web_ord'],
+		 [path: '/Order'],
+		 [path: '/order_conf'],
+		 [path: '/order_idl'],
+		 [path: '/order_cs'],
+		 [path: '/OrderComm'],
+		 [path: '/MechClecUtil'],
+		 [path: '/CLEC_MECH'],
+		 [path: '/EMAIL_CLEC'],
+		 [path: '/OutputGen'],
+		 [path: '/LOSInbound'],
+		 [path: '/LOSOutbound'],
+		 [path: '/Ibics2Pme_idl'],
+		 [path: '/Ibics2Pme_cs'],
+		 [path: '/Swf'],
+		 [path: '/lineLoss_bin'],
+		 [path: '/lineLoss'],
+		 [path: '/lsr_edi'],
+		 [path: '/lsr_libmpe'],
+		 [path: '/lsr_EDITrans'],
+		 [path: '/lsrv_EdiSender'],
+		 [path: '/lsrv_schema'],
+		 [path: '/ATTLSR_BS_SBC'],
+		 [path: '/BSOutbound'],
+		 [path: '/BSInbound'],
+		 [path: '/SBCOutbound'],
+		 [path: '/SBCInbound'],
+		 [path: '/SLNPOutBound'],
+		 [path: '/QwestOutbound'],
+		 [path: '/QwestInbound'],
+		 [path: '/tools'],
+		 [path: '/ATT_SIM'],
+		 [path: '/SLNPInbound'],
+		 [path: '/GIOMReceiver'],
+		 [path: '/EfmsRequestReceiver'],
+		 [path: '/EfmsStatusBack'],
+		 [path: '/LSRrouter'],
+		 [path: '/GIOMInfoRequestServer'],
+		 [path: '/LECBTNOrderStatusInfo'],
+		 [path: '/VCCSRRetriever'],
+		 [path: '/VCAggregator'],
+		 [path: '/CanopiStatusBack'],
+		 [path: '/CanopiRequestReceiver'],
+		 [path: '/ls_lsrv_XMLUtils'],
+		 [path: '/ls_lsrv_COX_Inbound'],
+		 [path: '/ls_lsrv_COX_Outbound'],
+		 [path: '/CoxCsrLookUp'],
+		 [path: '/ComcastCsrLookUp'],
+		 [path: '/lsrvTwCsrLookup'],
+		 [path: '/SXPStatusBack'],
+		 [path: '/BMORStatusBack'],
+		 [path: '/ls_lsrv_BB_req_artix'],
+		 [path: '/ls_lsrv_BB_Resp_artix'],
+		 [path: '/ls_lsrv_rules'],
+		 [path: '/ls_lsrv_RuleEngine'],
+		 [path: '/ls_lsrv_OrderInfo'],
+		 [path: '/build_system'],
+		 [path: '/swm_scripts'],
+		 [path: '/Jenkins_Scripts']]]],
+		 gitTool: 'GIT',
+		 submoduleCfg: [],
+		 userRemoteConfigs: [[credentialsId: '8d97233b-ae8f-4023-8955-7df898871a7d',
+		 url: 'https://codecloud.web.att.com/scm/st_lsrv2/lsrv.git']]])
+			}
+		}
+
+		stage("Build"){
+            when {
+                expression { params.PHASE == 'BUILD-DEPLOY' || params.PHASE == 'BUILD-ONLY' }
+                                } 		
+			steps{
+		
+			sh 'cd /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/Order_pipeline'
+
+			sh 'cp Jenkins_Scripts/Svn_build_lsrv_order_pipeline_jenkins.sh .'
+			sh 'cp Jenkins_Scripts/deploy_order_fullbuild_jenkins.sh .'
+			sh 'chmod 777 *'
+
+			sh './Svn_build_lsrv_order_pipeline_jenkins.sh ${release}'
+			}
+		
+		}
+		
+		stage("Upload to Nexus"){
+                when {
+                expression { params.PHASE == 'BUILD-DEPLOY' || params.PHASE == 'BUILD-ONLY' }
+                                  } 		
+			steps{
+			sh './deploy_order_fullbuild_jenkins.sh ${release}'
+			}
+		
+		}		
+		
+		stage("Upload to SWM"){
+                when {
+                expression { params.PHASE == 'BUILD-DEPLOY' || params.PHASE == 'BUILD-ONLY' }
+                                  } 		
+			steps{
+				
+			script {
+				env.SWM_VER = sh (script: 'cat /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/SCRIPTS/order_swm_versions.txt', returnStdout: true).trim()
+				env.AFTSWM_USERNAME = "m24363@lsrv01.att.com"
+				env.AFTSWM_PASSWORD = "enc:E04815BCE2EA8773FEACDEBF8DA79291"
+				}
+
+			sh '''mkdir -p /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/Order_pipeline/swm_scripts/order_all/swm/dist_files/order_all/
+			
+				cp /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/Order_pipeline/DEPO/lsrv_${release}.tar.gz /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/Order_pipeline/swm_scripts/order_all/swm/dist_files/order_all/order_all.tar.gz
+
+				rm -rf /export/home/lsrv/.subversion/auth/svn.simple/90bd1ac57b7055f82bb22b8d2ee70e4a
+
+				. /appl/shared/tools/build_ls_lsrv_artix5_5.env
+
+				cd /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/Order_pipeline/swm_scripts
+
+				rm -rf /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/Order_pipeline/swm_scripts/order_all/.svn
+
+				rm -rf /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/Order_pipeline/swm_scripts/order_all/swm/.svn
+
+				rm -rf /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/Order_pipeline/swm_scripts/order_all/swm/*/.svn
+
+				rm -rf /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/Order_pipeline/swm_scripts/order_all/swm/*/*/.svn
+
+				/opt/app/aft/aftswmcli/bin/swmcli \\ component pkgcreate -c com.att.lsrv:order_all:${SWM_VER} -d ./order_all'''
+
+			}
+		
+		}	
+
+		stage("SonarScan"){
+                when {
+                expression { params.PHASE == 'BUILD-DEPLOY' || params.PHASE == 'SONAR' }
+                                  } 		
+			steps{
+			
+			              echo '**Sonar Qube Scan**'
+
+              withSonarQubeEnv('LSRV_Sonar'){
+
+             echo '**Sonar Qube Scan**'
+
+                 dir ('/appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/Order_pipeline'){
+
+                    sh '''/opt/app/sonar-runner/2.8/bin/sonar-scanner \
+                    -Dsonar.projectKey=LSRV \
+					-Dsonar.projectName=LSRV \
+					-Dsonar.projectVersion=1.0 \
+					-Dsonar.projectDescription=LSRV \
+					-Dsonar.att.motsid=13504 \
+					-Dsonar.att.view.type=dev \
+					-Dsonar.language=java \
+					-DCSIWeb.sonar.projectName=BBNMS_Module \
+                    -Dsonar.login=b81a580cd0fe3e86f7ab07b99f5b45de4963a53f \
+                    -Dsonar.password= \
+                    -Dsonar.email.enabled=false \
+					-Dsonar.pdf.skip=true \
+					-Dsonar.scm.enabled=false \
+					-Dsonar.scm-stats.enabled=false \
+					-Dsonar.dynamicAnalysis=false \
+					-Dsonar.sources=. \
+					-Dsonar.java.binaries=CanopiRequestReceiver/build/classes \
+					-Dsonar.projectBaseDir=. \
+					-Dsonar.att.tattletale.enabled=true \
+					-Dsonar.att.dependencycheck.tattletale.sourceDirectory.path=. \
+					-Dsonar.att.tattletale.base.folder=. \
+					-Dsonar.att.dependencycheck.tattletale.destinationDirectory.path=tattletale \
+					-Dsonar.att.tattletale.binaries.folder=CanopiRequestReceiver/build/classes'''
+
+                  }
+				}
+			
+			}
+		
+			
+		}
+		stage("SAST"){
+                when {
+                expression { params.PHASE == 'BUILD-DEPLOY'}
+                                  } 		
+			steps{
+			echo "*****SASTAnalysis***************"
+			
+			script {
+
+                        def vAppName = '13504-LSRV'
+
+                        def vSandBoxName = vAppName+'_Order'+ "_${env.BUILD_NUMBER}"
+
+                        def vScanName = vSandBoxName
+  
+                        def vUpldPattrn='**/**.tar.gz'
+                          
+                          def Dirurl='/appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/Order_pipeline/DEPO'
+
+                            try {
+
+                               dir (Dirurl) {
+
+									veracode applicationName: vAppName,
+
+                                    createProfile: true,
+
+                                    criticality: 'High',
+
+                                    debug: true,
+  
+                                    createSandbox: true,
+
+                                    sandboxName: vSandBoxName,
+  
+                                    scanName: vScanName,
+
+                                    teams: "Default Team",
+
+                                    uploadIncludesPattern: vUpldPattrn,
+
+                                    useIDkey: true, 
+ 
+                                    vid: '874f2783db4c9f09b06c47d8be1f6de9', 
+ 
+                                    vkey: 'd0b6c3e0e821022393441f795eec61f99f18eb439e531d1f6a71e3fa18c28326638e83e0f83b449d1d45c8b98a9ab0acdd16979ca83129707623c90b2f3af936',
+
+                                    useProxy: true,
+
+                                    pHost: 'one.proxy.att.com',
+
+                                    pPort: '8080'
+
+								}
+
+                            }
+
+                            catch(Exception ex) {
+   
+								println 'unable to scan error:' + ex.toString()
+
+								ex.printStackTrace()
+  
+							}
+  
+					}
+			
+			}
+		}
+		
+		stage("Deploy"){
+                when {
+                expression { params.PHASE == 'BUILD-DEPLOY' }
+                                  } 		
+			steps{
+			script {
+				env.SWM_VER = sh (script: 'cat /appl/LSRV/node/sdt-lsrv.vci.att.com/appl/LSRV/node/sdt-lsrv.vci.att.com/workspace/SCRIPTS/order_swm_versions.txt', returnStdout: true).trim()
+				env.AFTSWM_USERNAME = "m24363@lsrv01.att.com"
+				env.AFTSWM_PASSWORD = "enc:E04815BCE2EA8773FEACDEBF8DA79291"
+				}
+				sh '''rm -rf /export/home/lsrv/.subversion/auth/svn.simple/90bd1ac57b7055f82bb22b8d2ee70e4a
+				
+				. /appl/shared/tools/build_lsrv_artix5_5_JAX_WS_JDK8_deployment_pipeline.env
+				
+				rm -f /appl/LSRV/swm/log/exit_status.txt
+				
+				/opt/app/aft/aftswmcli/bin/swmcli \\ component pkginstall -c com.att.lsrv:order_all:${SWM_VER} -ng ${TARGET_ENV} -w'''
+			}
+		
+		}			
+		
+	}
+	
+	post{ 
+		always{ 
+			emailext( 
+		subject: "Build ${env.JOB_NAME} -${currentBuild.displayName} ${currentBuild.result}", 
+		body: "${currentBuild.currentResult}: Job ${env.JOB_NAME} build ${env.SWM_VER}\nMore info at: ${env.BUILD_URL}",
+		recipientProviders: [[$class:'DevelopersRecipientProvider'],[$class:'RequesterRecipientProvider'],[$class:'UpstreamComitterRecipientProvider']] )   
+		}
+	}
+	
+}
